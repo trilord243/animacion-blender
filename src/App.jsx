@@ -1,6 +1,6 @@
 import { Canvas, useFrame } from '@react-three/fiber'
-import { OrbitControls, useGLTF, Environment, useAnimations } from '@react-three/drei'
-import { Suspense, useEffect, useRef } from 'react'
+import { OrbitControls, useGLTF, Environment, useAnimations, Html, useProgress } from '@react-three/drei'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import './App.css'
 
@@ -8,13 +8,48 @@ const FPS = 60
 const LOOP_START_FRAME = 100
 const LOOP_START_TIME = LOOP_START_FRAME / FPS
 
-function Model() {
+function Loader() {
+  const { progress } = useProgress()
+  return (
+    <Html center>
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '20px',
+        color: 'white',
+        fontFamily: 'sans-serif',
+      }}>
+        <div className="spinner" />
+        <p style={{ fontSize: '18px', margin: 0 }}>
+          Cargando... {progress.toFixed(0)}%
+        </p>
+        <div style={{
+          width: '200px',
+          height: '4px',
+          background: 'rgba(255,255,255,0.2)',
+          borderRadius: '2px',
+          overflow: 'hidden',
+        }}>
+          <div style={{
+            width: `${progress}%`,
+            height: '100%',
+            background: '#4fc3f7',
+            borderRadius: '2px',
+            transition: 'width 0.3s ease',
+          }} />
+        </div>
+      </div>
+    </Html>
+  )
+}
+
+function Model({ onReady }) {
   const group = useRef()
   const { scene, animations } = useGLTF('/bodyman.glb')
   const { actions, mixer } = useAnimations(animations, group)
 
   useEffect(() => {
-    // Start all actions
     const actionList = Object.values(actions)
     actionList.forEach((action) => {
       action.setLoop(THREE.LoopRepeat, Infinity)
@@ -23,14 +58,17 @@ function Model() {
       action.reset().play()
     })
 
+    if (actionList.length > 0) {
+      onReady()
+    }
+
     return () => {
       actionList.forEach((action) => {
         if (action) action.stop()
       })
     }
-  }, [actions, mixer, scene])
+  }, [actions, mixer, scene, onReady])
 
-  // Handle the loop: after first full play, clamp loop start to frame 100
   const hasCompletedFirst = useRef(false)
 
   useFrame(() => {
@@ -56,8 +94,28 @@ function Model() {
 }
 
 function App() {
+  const audioRef = useRef(null)
+  const [musicStarted, setMusicStarted] = useState(false)
+
+  const handleModelReady = () => {
+    if (!musicStarted && audioRef.current) {
+      audioRef.current.play().catch(() => {})
+      setMusicStarted(true)
+    }
+  }
+
+  const handleInteraction = () => {
+    if (audioRef.current && audioRef.current.paused) {
+      audioRef.current.play().catch(() => {})
+    }
+  }
+
   return (
-    <div style={{ width: '100vw', height: '100vh', background: '#1a1a2e' }}>
+    <div
+      style={{ width: '100vw', height: '100vh', background: '#1a1a2e' }}
+      onClick={handleInteraction}
+    >
+      <audio ref={audioRef} src="/music.mp3" loop />
       <Canvas
         camera={{ position: [0, 2, 5], fov: 60 }}
         shadows
@@ -65,8 +123,8 @@ function App() {
         <ambientLight intensity={0.5} />
         <directionalLight position={[5, 5, 5]} intensity={1} castShadow />
         <directionalLight position={[-5, 3, -5]} intensity={0.3} />
-        <Suspense fallback={null}>
-          <Model />
+        <Suspense fallback={<Loader />}>
+          <Model onReady={handleModelReady} />
           <Environment preset="sunset" />
         </Suspense>
         <OrbitControls
