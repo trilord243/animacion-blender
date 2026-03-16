@@ -19,7 +19,7 @@ function Model() {
     actionList.forEach((action) => {
       action.setLoop(THREE.LoopRepeat, Infinity)
       action.clampWhenFinished = false
-      action.timeScale = 0.5
+      action.timeScale = 0.35
       action.reset().play()
     })
 
